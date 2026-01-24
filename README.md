@@ -2,8 +2,6 @@
 
 AI application built with **pydantic-ai** and **MCP (Model Context Protocol) servers**, with optional **FastAPI** exposure.
 
----
-
 > [!NOTE]  
 > Please note that this project is in a very early stage of development and is a 
 > hobby project that I am building in my spare time. 
