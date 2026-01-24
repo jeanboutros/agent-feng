@@ -22,7 +22,8 @@ async def async_main(context: ApplicationContext) -> int:
     """Async entry point for the application.
 
     This function initializes all dependencies using the provided context
-    and starts the application.
+    and starts the application. This is the composition root where all
+    dependency wiring occurs.
 
     :param context: The application context with configuration and logger.
     :returns: Exit code (0 for success, non-zero for failure).
@@ -38,13 +39,67 @@ async def async_main(context: ApplicationContext) -> int:
     context.logger.info("Log level: %s", context.log_level.value)
     context.logger.info("Project root: %s", context.project_root)
 
-    # TODO: Initialize application components here
-    # - Load configuration from config/config.yaml
-    # - Initialize MCP clients
-    # - Initialize pydantic-ai agents
-    # - Start FastAPI server (if enabled)
+    # =========================================================================
+    # COMPOSITION ROOT: All dependency wiring happens here
+    # =========================================================================
 
-    context.logger.info("Agent Feng initialized successfully")
+    # Import infrastructure implementations (only in composition root)
+    from agent_feng.infrastructure.pydantic_ai_adapters import (
+        ModelType,
+        PydanticAIAgentAdapter,
+        PydanticAIModelAdapter,
+    )
+    from agent_feng.infrastructure.instructions import InstructionsFileReader
+    from agent_feng.application.stocks_news_service import StocksNewsService
+
+    agent_name = "feng_stocks_news_agent"
+
+    # Step 0: Create instructions reader (Infrastructure)
+    instructions_reader = InstructionsFileReader(context)
+    agent_instructions = instructions_reader.read_instructions(agent_name=agent_name)
+    context.logger.debug("Loaded instructions for stocks_news agent")
+
+    # TODO: Read these from config/config.yaml
+    # Step 1: Create model adapter (Infrastructure)
+    model_adapter = PydanticAIModelAdapter(
+        context=context,
+        model_type=ModelType.OLLAMA,
+        # model_name="qwen3-coder:latest",
+        model_name="qwen3-next:latest",
+        provider_config={
+            "base_url": "http://localhost:11434/v1",
+        },
+    )
+
+    # Step 2: Create agent provider (Infrastructure)
+    agent_provider = PydanticAIAgentAdapter[str, str](
+        context=context,
+        model_adapter=model_adapter,
+        instructions=agent_instructions,
+        output_type=str,
+        agent_name=agent_name,
+    )
+
+    # Step 3: Create application service with injected dependencies
+    stocks_news_service = StocksNewsService(
+        ai_provider=agent_provider,
+        context=context,
+    )
+
+    # =========================================================================
+    # APPLICATION EXECUTION
+    # =========================================================================
+
+    # Fetch and summarize stock market news from the last hour
+    response = await stocks_news_service.get_news(
+        "Search the web for stock market news from the last hour. "
+        "Find significant news about major companies, earnings reports, "
+        "market movements, and breaking financial news. "
+        "Summarize each item with the stock ticker, company name, and sentiment. "
+    )
+    context.logger.info("Stock News Response:\n%s", response)
+
+    context.logger.info("Agent Feng executed successfully")
 
     return 0
 
