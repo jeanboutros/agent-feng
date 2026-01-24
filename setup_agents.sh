@@ -1,7 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Create _libs directory
-mkdir -p _libs
+[ -d "_libs" ] || mkdir -p _libs
+
+# Check if _libs/ is in .gitignore, if not add it
+if ! grep -q "^_libs/$" .gitignore; then
+    echo "_libs/" >> .gitignore
+    echo "Added _libs/ to .gitignore"
+else
+    echo "_libs/ already in .gitignore"
+fi
 
 # Clone or update the repository
 if [ -d "_libs/agent-panpan" ]; then
