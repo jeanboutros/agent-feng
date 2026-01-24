@@ -328,30 +328,104 @@ def load_yaml_fixture(relative_path: str) -> dict[str, Any]:
 
 ---
 
-## 8. conftest.py Organisation
+## 8. conftest.py Organisation (Mandatory)
 
-### Root conftest.py
+### Root conftest.py is Always Required
 
-Located at `tests/conftest.py`, contains:
+**LEON must always create a `tests/conftest.py` file** when setting up tests for a project. This file is mandatory and serves as the central location for shared fixtures.
+
+Located at `tests/conftest.py`, it must contain:
 
 - Session-scoped fixtures (DB connections, expensive resources)
 - Widely-used fixtures (standard test users, configs)
 - pytest plugins and hooks
+- Any fixture used across multiple test modules
+
+### Mandatory conftest.py Template
+
+When creating a new test suite, LEON must generate this minimal `conftest.py`:
+
+```python
+"""Pytest configuration and global fixtures.
+
+This module contains shared fixtures and pytest configuration for the
+entire test suite. All fixtures defined here are automatically available
+to all test modules without explicit import.
+
+Example:
+    Fixtures are automatically injected::
+
+        def test_something(app_context: ApplicationContext) -> None:
+            assert app_context.environment == Environment.DEVELOPMENT
+"""
+
+from __future__ import annotations
+
+import pytest
+
+# Import application types for fixtures
+# from my_project.core import ApplicationContext, Environment, LogLevel
+
+
+# =============================================================================
+# Session-Scoped Fixtures (expensive resources, shared across all tests)
+# =============================================================================
+
+
+@pytest.fixture(scope="session")
+def test_config() -> dict[str, str]:
+    """Provide test configuration shared across all test sessions.
+
+    This fixture loads test-specific configuration that remains constant
+    throughout the entire test run.
+
+    Returns:
+        Configuration dictionary for testing.
+
+    Example:
+        Use in tests requiring configuration::
+
+            def test_with_config(test_config: dict[str, str]) -> None:
+                assert "environment" in test_config
+    """
+    return {
+        "environment": "testing",
+        "log_level": "DEBUG",
+    }
+
+
+# =============================================================================
+# Function-Scoped Fixtures (recreated for each test)
+# =============================================================================
+
+
+# Add project-specific fixtures below
+```
 
 ### Layer-Level conftest.py
 
-Each test layer may have its own `conftest.py`:
+Each test layer may have its own `conftest.py` for layer-specific fixtures:
 
 ```
 tests/
-├── conftest.py                  # Global fixtures
+├── conftest.py                  # Global fixtures (MANDATORY)
+├── core/
+│   └── conftest.py              # Core-layer fixtures (optional)
 ├── domain/
-│   ├── conftest.py              # Domain-layer fixtures
+│   ├── conftest.py              # Domain-layer fixtures (optional)
 │   └── test_models.py
 └── infrastructure/
     ├── conftest.py              # Infrastructure fixtures (mocks, stubs)
     └── test_adapters.py
 ```
+
+### Fixture Placement Rules
+
+| Fixture Scope | Location |
+|---------------|----------|
+| Used by 2+ layers | `tests/conftest.py` |
+| Used within single layer | `tests/<layer>/conftest.py` |
+| Used by single test file | Inline in the test file |
 
 ---
 
@@ -397,20 +471,92 @@ Markers allow you to create custom test suites that can be run selectively. This
 - Grouping tests by feature or domain
 - Running smoke tests before full suite
 
-### Defining Markers in pytest.ini
+### Defining Markers in pyproject.toml
 
-All custom markers MUST be defined in `pytest.ini` for readability and to avoid warnings:
+All custom markers and pytest configuration MUST be defined in `pyproject.toml` under the `[tool.pytest]` section (pytest 9.0+).
 
-```ini
-[pytest]
-markers =
-    slow: Tests that take longer than 1 second to execute
-    integration: Tests requiring external services or databases
-    smoke: Critical path tests to run before full suite
-    resource_exhausted: Tests for resource depletion scenarios
-    regression: Tests for previously fixed bugs
-    wip: Work in progress, may be skipped in CI
+---
+
+## 11. Pytest Configuration in pyproject.toml (Mandatory)
+
+### LEON Must Configure pyproject.toml
+
+When setting up tests for a project, LEON must add or update the pytest configuration in `pyproject.toml`. This is the preferred location for pytest settings (over `pytest.ini`).
+
+### Mandatory pyproject.toml Configuration (pytest 9.0+)
+
+Use `[tool.pytest]` to leverage native TOML types:
+
+```toml
+[tool.pytest]
+# Minimum pytest version required
+minversion = "9.0"
+
+# Default command-line options
+# -ra: Show extra test summary for all except passed
+# -q: Quieter output
+# --strict-markers: Raise error on unknown markers
+addopts = ["-ra", "-q", "--strict-markers"]
+
+# Directories to search for tests
+testpaths = ["tests"]
+
+# Python path for imports
+pythonpath = ["src"]
+
+# Async test configuration (if using pytest-asyncio)
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+# Custom markers - ALL markers must be registered here
+markers = [
+    "slow: Tests that take longer than 1 second to execute",
+    "integration: Tests requiring external services or databases",
+    "smoke: Critical path tests to run before full suite",
+    "unit: Fast unit tests with no external dependencies",
+    "regression: Tests for previously fixed bugs",
+    "wip: Work in progress, may be skipped in CI",
+]
+
+# Ignore specific warnings (use sparingly)
+filterwarnings = [
+    "error",  # Treat warnings as errors by default
+    "ignore::DeprecationWarning:third_party_lib.*",  # Example: ignore specific lib
+]
+
+# Test file patterns
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Logging configuration for tests
+log_cli = true
+log_cli_level = "WARNING"
+log_cli_format = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 ```
+
+### Legacy Configuration (pytest < 9.0)
+
+For older pytest versions, use `[tool.pytest.ini_options]`:
+
+```toml
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = ["-ra", "-q", "--strict-markers"]
+testpaths = ["tests"]
+pythonpath = ["src"]
+```
+
+### Configuration Best Practices
+
+| Setting | Purpose |
+|---------|---------|
+| `--strict-markers` | Catch undefined markers early |
+| `pythonpath = ["src"]` | Enable imports from src layout |
+| `asyncio_mode = "auto"` | Auto-detect async tests |
+| `filterwarnings = ["error"]` | Treat warnings as errors |
+| `log_cli = true` | Show logs during test runs |
 
 ### Applying Markers
 
@@ -473,18 +619,22 @@ pytest -m "smoke and not wip"
 
 ---
 
-## 11. Test Quality Gates
+## 12. Test Quality Gates
 
-### A Test is Incomplete if
+### A Test Suite is Incomplete if
 
+- `tests/conftest.py` does not exist
+- `pyproject.toml` lacks `[tool.pytest.ini_options]` or `[tool.pytest]` configuration 
+- Custom markers are used but not defined in `pyproject.toml`
 - Docstring is missing or vague
 - Parametrize lacks `ids` for readability
-- Fixtures are duplicated instead of shared
+- Fixtures are duplicated instead of shared via `conftest.py`
 - Edge cases are not covered
-- Test data is hardcoded instead of loaded from repository- Custom markers are used but not defined in `pytest.ini`
+- Test data is hardcoded instead of loaded from repository
+
 ---
 
-## 11. Best Practices Checklist
+## 13. Best Practices Checklist
 
 LEON enforces:
 
