@@ -4,6 +4,12 @@ AI application built with **pydantic-ai** and **MCP (Model Context Protocol) ser
 
 ---
 
+> [!NOTE]  
+> Please note that this project is in a very early stage of development and is a 
+> hobby project that I am building in my spare time. 
+> If you want to pitch in you are more than welcome and if you something that
+> doesn't look right please let me know.
+
 ## Vision
 
 Agent Feng is an autonomous, self-improving market intelligence system. Its purpose is to monitor, analyse, and predict market movements across multiple asset classes by coordinating specialised AI agents that continuously learn from their successes and failures.
