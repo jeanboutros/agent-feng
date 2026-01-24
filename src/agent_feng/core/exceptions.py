@@ -182,3 +182,23 @@ class AIProviderError(InfrastructureError):
     def __init__(self, provider: str, message: str) -> None:
         self.provider = provider
         super().__init__(f"AI provider '{provider}': {message}")
+
+
+class InstructionsReaderError(InfrastructureError):
+    """Error related to reading agent instructions.
+
+    Raised when instructions cannot be read, parsed, or validated.
+
+    :param agent_name: Name of the agent (if known).
+    :param message: Human-readable error description.
+
+    Example:
+        Raise for missing instructions::
+
+            raise InstructionsReaderError("stocks_agent", "No instructions file found")
+    """
+
+    def __init__(self, agent_name: str | None, message: str) -> None:
+        self.agent_name = agent_name
+        prefix = f"Instructions for '{agent_name}'" if agent_name else "Instructions"
+        super().__init__(f"{prefix}: {message}")

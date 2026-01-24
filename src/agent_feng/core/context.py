@@ -36,8 +36,9 @@ from typing import Final
 
 from dotenv import load_dotenv
 
-from agent_feng.core.abc import Environment, LogLevel
+from agent_feng.core.abc import Environment, LogLevel, SecretsProvider
 from agent_feng.infrastructure.logging import configure_logging
+from agent_feng.infrastructure.secrets import EnvironmentVariableSecretsProvider
 
 
 # Sentinel value for detecting missing .env file
@@ -75,6 +76,21 @@ def _get_project_root() -> Path:
 
     msg = "Could not determine project root directory"
     raise FileNotFoundError(msg)
+
+
+def _get_config_path(project_root: Path) -> Path:
+    """Get the configuration file path.
+
+    :param project_root: Path to the project root directory.
+    :returns: Path to the config directory.
+
+    Example:
+        Get config path::
+
+            root = _get_project_root()
+            config_path = _get_config_path(root)
+    """
+    return project_root / "config"
 
 
 def _load_env_file(
@@ -180,6 +196,7 @@ class ApplicationContext:
     environment: Environment
     log_level: LogLevel
     logger: logging.Logger = field(repr=False)
+    secrets_provider: SecretsProvider = field(repr=False)
 
     def __post_init__(self) -> None:
         """Validate context after initialization.
@@ -231,10 +248,16 @@ def create_application_context(
     # Step 4: Configure logging
     logger = configure_logging(level=log_level.value, environment=environment.value)
 
+    # TODO: Read a config file and get the secrets provider
+    # For now, we use EnvironmentVariableSecretsProvider which should be
+    # the default if none is provided.
+    secrets_provider = EnvironmentVariableSecretsProvider()
+
     # Step 5: Create and return context
     return ApplicationContext(
         project_root=project_root,
         environment=environment,
         log_level=log_level,
         logger=logger,
+        secrets_provider=secrets_provider,
     )
