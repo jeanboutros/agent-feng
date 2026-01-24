@@ -1,0 +1,25 @@
+# Agent Feng Configuration
+# This file contains application configuration settings.
+# Secrets should NOT be stored here - use .env or a secrets provider.
+
+application:
+  name: "Agent Feng"
+  version: "0.1.0"
+
+# MCP Server configuration
+mcp:
+  servers: []
+  # Example:
+  # - name: "example-server"
+  #   url: "http://localhost:8080"
+
+# AI Provider configuration
+ai:
+  provider: "openai"  # or "anthropic", "ollama", etc.
+  # Model-specific settings are loaded from environment variables
+
+# FastAPI configuration (when enabled)
+api:
+  enabled: false
+  host: "0.0.0.0"
+  port: 8000
