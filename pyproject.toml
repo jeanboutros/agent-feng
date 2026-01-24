@@ -1,0 +1,20 @@
+[project]
+name = "agent-feng"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Jean Boutros", email = "jean.boutros@bauermediaoutdoor.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "mcp>=1.25.0",
+    "pydantic-ai>=1.47.0",
+]
+
+[project.scripts]
+agent-feng = "agent_feng:main"
+
+[build-system]
+requires = ["uv_build>=0.9.22,<0.10.0"]
+build-backend = "uv_build"
