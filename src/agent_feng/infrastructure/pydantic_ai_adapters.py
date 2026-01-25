@@ -162,6 +162,13 @@ class PydanticAIAgentAdapter[
                 sep="T", timespec="seconds"
             )
 
+        @self._agent.tool
+        async def get_output_file_path(ctx: RunContext) -> Any:
+            ts = datetime.datetime.now(tz=datetime.timezone.utc).isoformat(
+                sep="T", timespec="seconds"
+            )
+            return f"outputs/{ts}Z_{self._agent_name}.md"
+
     async def _handle_event(self, event: AgentStreamEvent) -> None:
         """Handle intermediate events from the agent run.
 
