@@ -19,11 +19,12 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
+from agent_feng.core.abc import InstructionsReader
 from agent_feng.core.context import ApplicationContext
 from agent_feng.core.exceptions import InstructionsReaderError
 
 
-class InstructionsFileReader:
+class InstructionsFileReader(InstructionsReader):
     """File-based instructions reader.
 
     Reads agent instructions from JSON files in the config/instructions directory.
@@ -38,6 +39,8 @@ class InstructionsFileReader:
             reader = InstructionsFileReader(context)
             instructions = reader.read_instructions("stocks_news")
     """
+
+    __slots__ = ("_context", "_logger")
 
     def __init__(self, context: ApplicationContext) -> None:
         self._context = context

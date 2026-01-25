@@ -93,6 +93,21 @@ def _get_config_path(project_root: Path) -> Path:
     return project_root / "config"
 
 
+def _get_instructions_path(project_root: Path) -> Path:
+    """Get the instructions file path.
+
+    :param project_root: Path to the project root directory.
+    :returns: Path to the instructions directory.
+
+    Example:
+        Get instructions path::
+
+            root = _get_project_root()
+            instructions_path = _get_instructions_path(root)
+    """
+    return _get_config_path(project_root) / "instructions"
+
+
 def _load_env_file(
     project_root: Path,
     *,
@@ -193,6 +208,8 @@ class ApplicationContext:
     """
 
     project_root: Path
+    config_path: Path
+    instructions_path: Path
     environment: Environment
     log_level: LogLevel
     logger: logging.Logger = field(repr=False)
@@ -237,6 +254,8 @@ def create_application_context(
     """
     # Step 1: Determine project root
     project_root = _get_project_root()
+    config_path = _get_config_path(project_root)
+    instructions_path = _get_instructions_path(project_root)
 
     # Step 2: Load environment file
     _load_env_file(project_root, raise_on_missing=raise_on_missing_env)
@@ -256,6 +275,8 @@ def create_application_context(
     # Step 5: Create and return context
     return ApplicationContext(
         project_root=project_root,
+        config_path=config_path,
+        instructions_path=instructions_path,
         environment=environment,
         log_level=log_level,
         logger=logger,

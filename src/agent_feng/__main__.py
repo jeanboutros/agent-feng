@@ -54,9 +54,6 @@ async def async_main(context: ApplicationContext) -> int:
 
     agent_name = "feng_stocks_news_agent"
 
-    # Step 0: Create instructions reader (Infrastructure)
-    instructions_reader = InstructionsFileReader(context)
-    agent_instructions = instructions_reader.read_instructions(agent_name=agent_name)
     context.logger.debug("Loaded instructions for stocks_news agent")
 
     # TODO: Read these from config/config.yaml
@@ -77,7 +74,7 @@ async def async_main(context: ApplicationContext) -> int:
     agent_provider = PydanticAIAgentAdapter[str, str](
         context=context,
         model_adapter=model_adapter,
-        instructions=agent_instructions,
+        instructions_reader=InstructionsFileReader(context=context),
         output_type=str,
         agent_name=agent_name,
     )
