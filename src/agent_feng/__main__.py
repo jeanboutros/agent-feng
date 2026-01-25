@@ -52,7 +52,11 @@ async def async_main(context: ApplicationContext) -> int:
     from agent_feng.infrastructure.instructions import InstructionsFileReader
     from agent_feng.application.stocks_news_service import StocksNewsService
 
+    # TODO: Read agent names from config/config.yaml
+    # Sorry if you are reading this code, hardcoding for now to move fast
+    # and test things out.
     agent_name = "feng_stocks_news_agent"
+    agent_name_1 = "feng_news_fact_checker_agent"
 
     context.logger.debug("Loaded instructions for stocks_news agent")
 
