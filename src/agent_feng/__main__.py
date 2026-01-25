@@ -65,7 +65,9 @@ async def async_main(context: ApplicationContext) -> int:
         context=context,
         model_type=ModelType.OLLAMA,
         # model_name="qwen3-coder:latest",
-        model_name="qwen3-next:latest",
+        # model_name="qwen3-next:latest",
+        # model_name="glm-4.7-flash:q8_0",
+        model_name="nemotron-3-nano:30b",
         provider_config={
             "base_url": "http://localhost:11434/v1",
         },
@@ -92,10 +94,25 @@ async def async_main(context: ApplicationContext) -> int:
 
     # Fetch and summarize stock market news from the last hour
     response = await stocks_news_service.get_news(
-        "Search the web for stock market news from the last hour. "
-        "Find significant news about major companies, earnings reports, "
-        "market movements, and breaking financial news. "
-        "Summarize each item with the stock ticker, company name, and sentiment. "
+        # "First, read the latest new from outputs/20260124TXXXXXX_news.md "
+        "Look up the latest stock market news from the last hour on the web. "
+        "Summarize the key stock market news items from the last hour. "
+        # "Don't search the web. "
+        "use brave_web_search tool to get more details about any news items you find relevant. "
+        "Use brave_news_search tool to get news articles. "
+        "use the parameter country and try other countries than US. "
+        "Asia and Europe markets are equally important. "
+        "don't use brave_image_search tool and brave_video_search tool. "
+        "save the summary to the disk inside the outputs folder and explain where you saved it."
+        "Each news item in the summary should include the stock ticker, company name, and sentiment. "
+        "Each news item should have one or more sources cited. "
+        # "Then Search the web for stock market news from the last hour. "
+        # "Find significant news about major companies, earnings reports, "
+        # "market movements, and breaking financial news. "
+        # "Summarize each item with the stock ticker, company name, and sentiment. "
+        # "Provide a concise summary of the overall market sentiment based on the news found. "
+        # "Cite sources where applicable. "
+        # "Lastly save the response in markdown format in the folder ./outputs/"
     )
     context.logger.info("Stock News Response:\n%s", response)
 
