@@ -12,7 +12,7 @@ Example:
 from __future__ import annotations
 from datetime import datetime, timezone
 from enum import StrEnum
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class Sentiment(StrEnum):
@@ -132,4 +132,11 @@ class NewsAnalysisReport(BaseModel):
     analysis_generated_at: datetime = Field(
         default_factory=lambda: datetime.now(tz=timezone.utc),
         description="Date and time when the analysis was generated in UTC",
+    )
+
+    model_config = ConfigDict(
+        validate_assignment=False,
+        json_encoders={
+            datetime: lambda v: v.isoformat(sep=" ", timespec="seconds"),
+        },
     )

@@ -102,6 +102,7 @@ class PydanticAIAgentAdapter[
         )
         self._logger = context.logger.getChild("PydanticAIAgentAdapter")
         self._agent_name = agent_name
+
         file_server = MCPServerStdio(
             command="npx",
             args=[
@@ -117,6 +118,7 @@ class PydanticAIAgentAdapter[
             command="npx",
             args=["-y", "@timlukahorstmann/mcp-weather"],
             env={"ACCUWEATHER_API_KEY": accuweather_api_key},
+            max_retries=3,
         )
 
         brave_search_api_key = context.secrets_provider.get_secret("BRAVE_API_KEY")
@@ -125,18 +127,40 @@ class PydanticAIAgentAdapter[
             command="npx",
             args=["-y", "@brave/brave-search-mcp-server", "--transport", "stdio"],
             env={"BRAVE_API_KEY": brave_search_api_key},
+            max_retries=3,
         )
 
         self._agent = Agent(
             model=model_adapter.model,
-            instructions=self._instructions,
+            system_prompt=self._instructions,
             output_type=output_type,
             toolsets=[
                 file_server,
-                #   accu_weather,
+                accu_weather,
                 brave_search,
             ],
+            retries=3,  # Allow more retries for output validation
         )
+
+        @self._agent.system_prompt
+        async def agent_name_prompt(ctx: RunContext) -> str:
+            return f"You are an AI agent named {self._agent_name}."
+
+        @self._agent.system_prompt
+        async def current_datetime_prompt(ctx: RunContext) -> str:
+            current_datetime = datetime.datetime.now(
+                tz=datetime.timezone.utc
+            ).isoformat(sep=" ", timespec="seconds")
+            return f"The current date and time is {current_datetime}."
+
+        @self._agent.system_prompt
+        async def json_output_prompt(ctx: RunContext) -> str:
+            return (
+                "CRITICAL: Your final response MUST be valid JSON only. "
+                "Do NOT include markdown, explanations, or any text outside the JSON object. "
+                "Do NOT wrap JSON in code blocks. "
+                "The JSON must match the required schema exactly with all required fields."
+            )
 
         self.add_tool()
 

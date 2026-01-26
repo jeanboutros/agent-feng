@@ -11,3 +11,5 @@ wheels/
 
 _libs/
 .env
+
+.DS_Store

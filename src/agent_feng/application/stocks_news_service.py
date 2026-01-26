@@ -19,6 +19,7 @@ from typing import Any
 
 from agent_feng.core.abc import AgentProvider
 from agent_feng.core.context import ApplicationContext
+from agent_feng.domain.models import NewsAnalysisReport
 
 
 class StocksNewsService:
@@ -40,14 +41,14 @@ class StocksNewsService:
 
     def __init__(
         self,
-        ai_provider: AgentProvider[Any, str, str],
+        ai_provider: AgentProvider[Any, str, NewsAnalysisReport],
         context: ApplicationContext,
     ) -> None:
         self._ai_provider = ai_provider
         self._context = context
         self._logger = context.logger.getChild("StocksNewsService")
 
-    async def get_news(self, query: str) -> str:
+    async def get_news(self, query: str) -> NewsAnalysisReport:
         """Retrieve and analyze stock news based on query.
 
         :param query: The stock news query (e.g., ticker symbol or question).
@@ -58,7 +59,25 @@ class StocksNewsService:
 
                 news = await service.get_news("Latest AAPL earnings news")
         """
+        import json
+        from datetime import datetime, timezone
+
         self._logger.debug("Processing stock news query: %s", query[:50])
         response = await self._ai_provider.generate_response(query)
         self._logger.info("Generated stock news response successfully")
+
+        # Save the report to outputs folder
+        timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
+        output_path = (
+            self._context.project_root
+            / "outputs"
+            / f"{timestamp}Z_feng_stocks_news_agent.json"
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with output_path.open("w", encoding="utf-8") as f:
+            json.dump(response.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
+
+        self._logger.info("Saved report to %s", output_path)
+
         return response

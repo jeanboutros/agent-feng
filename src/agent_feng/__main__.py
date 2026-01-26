@@ -13,9 +13,13 @@ Example:
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 
 from agent_feng.core import ApplicationContext, create_application_context
+from agent_feng.domain.models import NewsAnalysisReport
+from datetime import datetime, timezone
+import aiofiles
 
 
 async def async_main(context: ApplicationContext) -> int:
@@ -68,18 +72,19 @@ async def async_main(context: ApplicationContext) -> int:
         # model_name="qwen3-coder:latest",
         # model_name="qwen3-next:latest",
         # model_name="glm-4.7-flash:q8_0",
-        model_name="nemotron-3-nano:30b",
+        # model_name="nemotron-3-nano:30b",
+        model_name="mistral",
         provider_config={
             "base_url": "http://localhost:11434/v1",
         },
     )
 
     # Step 2: Create agent provider (Infrastructure)
-    agent_provider = PydanticAIAgentAdapter[str, str](
+    agent_provider = PydanticAIAgentAdapter[str, NewsAnalysisReport](
         context=context,
         model_adapter=model_adapter,
         instructions_reader=InstructionsFileReader(context=context),
-        output_type=str,
+        output_type=NewsAnalysisReport,
         agent_name=agent_name,
     )
 
