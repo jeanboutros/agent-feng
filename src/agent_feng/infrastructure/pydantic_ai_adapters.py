@@ -1,5 +1,6 @@
-import datetime
+from datetime import datetime, timezone
 from enum import StrEnum
+import json
 from typing import Any
 
 from pydantic_ai import (
@@ -18,7 +19,9 @@ from agent_feng.core.abc import (
     AgentProvider,
     AIModelAdapter,
     InstructionsReader,
+    WebSearcher,
 )
+from agent_feng.domain.models import NewsAnalysisReport
 
 
 # TODO move to exceptions module
@@ -93,6 +96,7 @@ class PydanticAIAgentAdapter[
         model_adapter: PydanticAIModelAdapter,
         instructions_reader: InstructionsReader,
         agent_name: str,
+        news_client: WebSearcher,
         output_type: type[R] = str,
     ) -> None:
         self._context = context
@@ -102,6 +106,7 @@ class PydanticAIAgentAdapter[
         )
         self._logger = context.logger.getChild("PydanticAIAgentAdapter")
         self._agent_name = agent_name
+        self._news_client = news_client
 
         file_server = MCPServerStdio(
             command="npx",
@@ -137,7 +142,7 @@ class PydanticAIAgentAdapter[
             toolsets=[
                 file_server,
                 accu_weather,
-                brave_search,
+                # brave_search,
             ],
             retries=3,  # Allow more retries for output validation
         )
@@ -148,9 +153,9 @@ class PydanticAIAgentAdapter[
 
         @self._agent.system_prompt
         async def current_datetime_prompt(ctx: RunContext) -> str:
-            current_datetime = datetime.datetime.now(
-                tz=datetime.timezone.utc
-            ).isoformat(sep=" ", timespec="seconds")
+            current_datetime = datetime.now(tz=timezone.utc).isoformat(
+                sep=" ", timespec="seconds"
+            )
             return f"The current date and time is {current_datetime}."
 
         @self._agent.system_prompt
@@ -182,16 +187,58 @@ class PydanticAIAgentAdapter[
 
         @self._agent.tool
         async def get_current_iso_datetime(ctx: RunContext) -> Any:
-            return datetime.datetime.now(tz=datetime.timezone.utc).isoformat(
-                sep="T", timespec="seconds"
-            )
+            return datetime.now(tz=timezone.utc).isoformat(sep="T", timespec="seconds")
 
         @self._agent.tool
         async def get_output_file_path(ctx: RunContext) -> Any:
-            ts = datetime.datetime.now(tz=datetime.timezone.utc).isoformat(
-                sep="T", timespec="seconds"
-            )
+            ts = datetime.now(tz=timezone.utc).isoformat(sep="T", timespec="seconds")
             return f"outputs/{ts}Z_{self._agent_name}.md"
+
+        @self._agent.tool
+        async def search_news(
+            ctx: RunContext, query: str, num_results: int = 30
+        ) -> Any:
+            response = await self._news_client.search(
+                query=query,
+                num_results=num_results,
+            )
+            return response.model_dump_json()
+
+        @self._agent.tool
+        async def save_to_file(ctx: RunContext, content: str) -> str:
+            """Save the news analysis report to a JSON file.
+
+            Args:
+                content: The JSON string containing the NewsAnalysisReport data.
+
+            Returns:
+                str: Confirmation message with the file path.
+            """
+            # Save the report to outputs folder
+            timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
+
+            output_path = (
+                self._context.project_root
+                / "outputs"
+                / f"{timestamp}Z_{self._agent_name}.json"
+            )
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Parse and validate the JSON content
+            try:
+                parsed_content = json.loads(content)
+            except json.JSONDecodeError:
+                # If already a dict-like string representation, try to use as-is
+                parsed_content = content
+
+            with output_path.open("w", encoding="utf-8") as f:
+                if isinstance(parsed_content, dict):
+                    json.dump(parsed_content, f, indent=2, ensure_ascii=False)
+                else:
+                    f.write(str(parsed_content))
+
+            self._logger.info("Saved report to %s", output_path)
+            return f"Report saved successfully to {output_path}"
 
     async def _handle_event(self, event: AgentStreamEvent) -> None:
         """Handle intermediate events from the agent run.

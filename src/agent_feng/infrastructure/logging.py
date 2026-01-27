@@ -25,7 +25,7 @@ class UTCFormatter(logging.Formatter):
 
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
         """Format time in UTC with Z suffix.
-        
+
         :param record: The log record.
         :param datefmt: Date format string.
         :returns: Formatted timestamp in UTC with Z suffix.
@@ -36,7 +36,7 @@ class UTCFormatter(logging.Formatter):
         else:
             s = time.strftime("%Y-%m-%d %H:%M:%S", ct)
         return f"{s}Z"
-    
+
     converter = time.gmtime  # Use UTC instead of local time
 
 
@@ -92,3 +92,18 @@ def configure_logging(
     logger.addHandler(console_handler)
 
     return logger
+    logger = logging.getLogger("PANPAN")
+
+
+def get_main_logger() -> logging.Logger:
+    """Get the main PANPAN logger.
+
+    :returns: The main PANPAN logger instance.
+
+    Example:
+        Get the main logger::
+
+            logger = get_main_logger()
+            logger.info("Using the main logger")
+    """
+    return logging.getLogger("PANPAN")

@@ -19,6 +19,8 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Protocol
 
+from agent_feng.domain.brave_search import NewsSearchApiResponse
+
 
 class Environment(StrEnum):
     """Valid application environments.
@@ -147,5 +149,27 @@ class InstructionsReader(Protocol):
         :param agent_name: The name of the agent.
         :returns: The instructions as a single string.
         :raises InstructionsReaderError: If instructions cannot be read.
+        """
+        ...
+
+
+class WebSearcher(Protocol):
+    """Protocol for web searcher implementations.
+
+    Example:
+        Implement a custom web searcher::
+
+            from agent_feng.core.abc import WebSearcher
+
+            class MyWebSearcher:
+                ...
+    """
+
+    async def search(self, query: str, num_results: int = 10) -> NewsSearchApiResponse:
+        """Perform a web search for the given query.
+
+        :param query: The search query string.
+        :param num_results: The number of results to return.
+        :returns: A list of URLs as search results.
         """
         ...

@@ -66,18 +66,18 @@ class StocksNewsService:
         response = await self._ai_provider.generate_response(query)
         self._logger.info("Generated stock news response successfully")
 
-        # Save the report to outputs folder
-        timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
-        output_path = (
-            self._context.project_root
-            / "outputs"
-            / f"{timestamp}Z_feng_stocks_news_agent.json"
-        )
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # # Save the report to outputs folder
+        # timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
+        # output_path = (
+        #     self._context.project_root
+        #     / "outputs"
+        #     / f"{timestamp}Z_feng_stocks_news_agent.json"
+        # )
+        # output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with output_path.open("w", encoding="utf-8") as f:
-            json.dump(response.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
+        # with output_path.open("w", encoding="utf-8") as f:
+        #     json.dump(response.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
 
-        self._logger.info("Saved report to %s", output_path)
+        # self._logger.info("Saved report to %s", output_path)
 
         return response

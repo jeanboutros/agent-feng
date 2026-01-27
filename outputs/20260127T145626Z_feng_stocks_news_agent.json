@@ -1,0 +1,37 @@
+{
+  "news_items": [
+    {
+      "headline": "Asian Markets Rally After Positive Chinese Data",
+      "stock_ticker": "HSCEI",
+      "company_name": "Hang Seng China Enterprises Index",
+      "sentiment": "BULLISH",
+      "reasoning": "Sharp rise in Purchasing Manager's Index (PMI) indicates robust economic growth.",
+      "sources": [
+        {
+          "name": "Bloomberg",
+          "url": "https://www.bloomberg.com/news/articles/2026-01-27/china-pmi-surges-to-9-month-high-stoking-market-optimism"
+        }
+      ],
+      "published_at": "2026-01-27T11:30:00Z",
+      "retrieved_at": "2026-01-27T13:55:07Z"
+    },
+    {
+      "headline": "European Markets Tumble on German Unemployment Report",
+      "stock_ticker": "EURO STOXX 50",
+      "company_name": "European Blue-Chip Stocks Index",
+      "sentiment": "BEARISH",
+      "reasoning": "7,000 job losses signal economic slowdown and concern over global manufacturing demand.",
+      "sources": [
+        {
+          "name": "Reuters",
+          "url": "https://www.reuters.com/article/us-europe-employment-resultsidUSKBN29H1U8"
+        }
+      ],
+      "published_at": "2026-01-27T09:30:00Z",
+      "retrieved_at": "2026-01-27T13:55:07Z"
+    }
+  ],
+  "summary": "Asian stock markets experienced a rally following strong Chinese economic data, while European stocks faced significant losses due to disappointing German employment reports.",
+  "analysis": "Optimistic Asian sentiment may signal continued growth for the region, while European markets could face persistent challenges if job losses continue.",
+  "analysis_generated_at": "2026-01-27 14:56:06+00:00"
+}

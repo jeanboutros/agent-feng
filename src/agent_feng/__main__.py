@@ -21,6 +21,8 @@ from agent_feng.domain.models import NewsAnalysisReport
 from datetime import datetime, timezone
 import aiofiles
 
+from agent_feng.infrastructure.web_clients import BraveSearchClient
+
 
 async def async_main(context: ApplicationContext) -> int:
     """Async entry point for the application.
@@ -86,6 +88,9 @@ async def async_main(context: ApplicationContext) -> int:
         instructions_reader=InstructionsFileReader(context=context),
         output_type=NewsAnalysisReport,
         agent_name=agent_name,
+        news_client=BraveSearchClient(
+            api_key=context.secrets_provider.get_secret("BRAVE_API_KEY"),
+        ),
     )
 
     # Step 3: Create application service with injected dependencies
@@ -94,6 +99,12 @@ async def async_main(context: ApplicationContext) -> int:
         context=context,
     )
 
+    # async with BraveSearchClient(
+    #     api_key=context.secrets_provider.get_secret("BRAVE_API_KEY"),
+    # ) as search_client:
+    #     response = await search_client.search("Latest stock market news", num_results=5)
+    #     context.logger.info("Brave Search Response: %s", response.model_dump_json())
+    # exit(0)
     # =========================================================================
     # APPLICATION EXECUTION
     # =========================================================================
@@ -104,14 +115,14 @@ async def async_main(context: ApplicationContext) -> int:
         "Look up the latest stock market news from the last hour on the web. "
         "Summarize the key stock market news items from the last hour. "
         # "Don't search the web. "
-        "use brave_web_search tool to get more details about any news items you find relevant. "
-        "Use brave_news_search tool to get news articles. "
-        "use the parameter country and try other countries than US. "
+        # "use brave_web_search tool to get more details about any news items you find relevant. "
+        # "Use brave_news_search tool to get news articles. "
+        # "use the parameter country and try other countries than US. "
         "Asia and Europe markets are equally important. "
-        "don't use brave_image_search tool and brave_video_search tool. "
-        "save the summary to the disk inside the outputs folder and explain where you saved it."
-        "Each news item in the summary should include the stock ticker, company name, and sentiment. "
-        "Each news item should have one or more sources cited. "
+        # "don't use brave_image_search tool and brave_video_search tool. "
+        # "save the summary to the disk inside the outputs folder and explain where you saved it."
+        # "Each news item in the summary should include the stock ticker, company name, and sentiment. "
+        # "Each news item should have one or more sources cited. "
         # "Then Search the web for stock market news from the last hour. "
         # "Find significant news about major companies, earnings reports, "
         # "market movements, and breaking financial news. "
