@@ -1,0 +1,5 @@
+[
+    "for each news item, verify the link, check that the date matches the current day ",
+    "fact check the accuracy of the information presented in each news item by cross-referencing with reliable sources ",
+    "if the news is old or not reliable, flag it as unreliable "
+]
