@@ -13,13 +13,10 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import re
 import sys
 
 from agent_feng.core import ApplicationContext, create_application_context
-from agent_feng.domain.models import NewsAnalysisReport
-from datetime import datetime, timezone
-import aiofiles
+from agent_feng.domain.models import AgentDeps, NewsAnalysisReport
 
 from agent_feng.infrastructure.web_clients import BraveSearchClient
 
@@ -75,13 +72,29 @@ async def async_main(context: ApplicationContext) -> int:
         # model_name="qwen3-next:latest",
         # model_name="glm-4.7-flash:q8_0",
         # model_name="nemotron-3-nano:30b",
-        model_name="mistral",
+        # model_name="mistral",
+        model_name="qwen3:30b",
         provider_config={
             "base_url": "http://localhost:11434/v1",
         },
     )
 
-    # Step 2: Create agent provider (Infrastructure)
+    # Step 2: Create agent dependencies with runtime context
+    agent_deps = AgentDeps(
+        agent_name=agent_name,
+        search_lookback_hours=1,  # Only last hour of news
+        target_regions=["US", "Asia", "Europe"],
+        max_news_items=30,
+        model_guidance="""# Model Accuracy Guidelines
+- Use EXACT headlines from search results (verbatim, no paraphrasing)
+- Use EXACT URLs from search results (copy character-for-character)
+- Use page_age from search results for published_at timestamps
+- Process ALL news items from search results, not just one
+- Extract stock ticker if mentioned, otherwise use relevant index (SPX, NDX, etc.)
+- Determine sentiment based on actual description content""",
+    )
+
+    # Step 3: Create agent provider (Infrastructure)
     agent_provider = PydanticAIAgentAdapter[str, NewsAnalysisReport](
         context=context,
         model_adapter=model_adapter,
@@ -91,9 +104,10 @@ async def async_main(context: ApplicationContext) -> int:
         news_client=BraveSearchClient(
             api_key=context.secrets_provider.get_secret("BRAVE_API_KEY"),
         ),
+        deps=agent_deps,
     )
 
-    # Step 3: Create application service with injected dependencies
+    # Step 4: Create application service with injected dependencies
     stocks_news_service = StocksNewsService(
         ai_provider=agent_provider,
         context=context,

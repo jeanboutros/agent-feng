@@ -21,7 +21,7 @@ from agent_feng.core.abc import (
     InstructionsReader,
     WebSearcher,
 )
-from agent_feng.domain.models import NewsAnalysisReport
+from agent_feng.domain.models import AgentDeps
 
 
 # TODO move to exceptions module
@@ -98,6 +98,7 @@ class PydanticAIAgentAdapter[
         agent_name: str,
         news_client: WebSearcher,
         output_type: type[R] = str,
+        deps: AgentDeps | None = None,
     ) -> None:
         self._context = context
         self._model_adapter = model_adapter
@@ -107,6 +108,7 @@ class PydanticAIAgentAdapter[
         self._logger = context.logger.getChild("PydanticAIAgentAdapter")
         self._agent_name = agent_name
         self._news_client = news_client
+        self._deps = deps or AgentDeps(agent_name=agent_name)
 
         file_server = MCPServerStdio(
             command="npx",
@@ -135,42 +137,91 @@ class PydanticAIAgentAdapter[
             max_retries=3,
         )
 
-        self._agent = Agent(
+        # Note: MCP filesystem tools (file_server) are DISABLED for stocks news agent
+        # because the qwen3:30b model confuses search_files (filesystem) with search_news (web).
+        # Re-enable only if the model is switched to one that handles tool disambiguation better.
+        self._agent: Agent[AgentDeps, R] = Agent(
             model=model_adapter.model,
             system_prompt=self._instructions,
             output_type=output_type,
+            deps_type=AgentDeps,
             toolsets=[
-                file_server,
+                # file_server,  # Disabled - causes tool confusion with search_news
                 accu_weather,
-                # brave_search,
+                # brave_search,  # Using Python tool for news search instead
             ],
             retries=3,  # Allow more retries for output validation
         )
 
-        @self._agent.system_prompt
-        async def agent_name_prompt(ctx: RunContext) -> str:
-            return f"You are an AI agent named {self._agent_name}."
+        # @self._agent.system_prompt
+        # async def thinking_mode_prompt(ctx: RunContext[AgentDeps]) -> str:
+        #     # /no_think disables qwen3's extended thinking mode to reduce verbosity
+        #     return "/no_think"
 
         @self._agent.system_prompt
-        async def current_datetime_prompt(ctx: RunContext) -> str:
-            current_datetime = datetime.now(tz=timezone.utc).isoformat(
-                sep=" ", timespec="seconds"
-            )
-            return f"The current date and time is {current_datetime}."
+        async def environment_prompt(ctx: RunContext[AgentDeps]) -> str:
+            deps = ctx.deps
+            year = deps.current_datetime.year
+            return f"""# Environment
+Agent: {deps.agent_name}
+Current datetime (UTC): {deps.current_datetime_iso}
+Current year: {year} (THIS IS CORRECT - do NOT "fix" dates from {year})
+Earliest news date: {deps.earliest_search_date_iso}
+Search lookback: {deps.search_lookback_hours} hours
+Target regions: {deps.regions_str}
+Max news items: {deps.max_news_items}
+Output format: {deps.output_format}
+
+## CRITICAL: Include ALL news items
+You MUST include EVERY news item returned by search_news in your final report.
+Do NOT summarize multiple articles into one. Create a separate NewsItem for EACH result.
+If search returns 30 results, your news_items array MUST have 30 entries.
+
+{deps.model_guidance}"""
 
         @self._agent.system_prompt
-        async def json_output_prompt(ctx: RunContext) -> str:
-            return (
-                "CRITICAL: Your final response MUST be valid JSON only. "
-                "Do NOT include markdown, explanations, or any text outside the JSON object. "
-                "Do NOT wrap JSON in code blocks. "
-                "The JSON must match the required schema exactly with all required fields."
-            )
+        async def output_policy_prompt(ctx: RunContext[AgentDeps]) -> str:
+            return """# Output Policy
+- Return ONLY valid JSON. No markdown. No code blocks. No explanations.
+- Match the required schema exactly with all required fields.
+- Be concise. Do not add preamble or postamble.
+- Include ALL news items from search results - do NOT aggregate or summarize into fewer items.
+- Dates from search results are CORRECT. Do not modify or "fix" them.
+- Copy URLs and headlines EXACTLY as returned by tools."""
+
+        @self._agent.system_prompt
+        async def tools_prompt(ctx: RunContext[AgentDeps]) -> str:
+            return """# Tool Selection Guide
+
+## CRITICAL: Choose the Right Tool for News
+- For NEWS from the INTERNET -> call `search_news` (Brave Search API)
+- For LOCAL FILES on disk -> call `search_files` or `read_file` (MCP Filesystem)
+
+⚠️ NEVER use `search_files` to search for news. It only finds local files by filename.
+
+## search_news (WEB SEARCH - USE THIS FOR FINANCIAL NEWS)
+Searches the internet for news articles via Brave Search API.
+- query (str): Search terms like "stock market news"  
+- num_results (int): Number of results (default: 30)
+Returns: title, url, description, page_age, meta_url from real web sources.
+
+## get_current_iso_datetime
+Returns current UTC datetime in ISO format. Use for retrieved_at timestamps.
+
+## save_to_file (MANDATORY FINAL STEP)
+Saves content to persistent storage. Call AFTER generating your report.
+- content (str): The JSON string to save
+
+## MCP Filesystem Tools (LOCAL FILES ONLY)
+- search_files: Finds files by glob pattern (NOT web search)
+- read_file: Reads local file by path
+- list_directory: Lists folder contents
+Only use if explicitly asked to access local files."""
 
         self.add_tool()
 
     @property
-    def agent(self) -> Agent:
+    def agent(self) -> Agent[AgentDeps, R]:
         """Get the underlying pydantic-ai agent."""
         return self._agent
 
@@ -182,30 +233,52 @@ class PydanticAIAgentAdapter[
         """
 
         @self._agent.tool
-        async def get_agent_name(ctx: RunContext) -> Any:
-            return self._agent_name
+        async def get_agent_name(ctx: RunContext[AgentDeps]) -> Any:
+            """Get the name of this agent."""
+            return ctx.deps.agent_name
 
         @self._agent.tool
-        async def get_current_iso_datetime(ctx: RunContext) -> Any:
-            return datetime.now(tz=timezone.utc).isoformat(sep="T", timespec="seconds")
+        async def get_current_iso_datetime(ctx: RunContext[AgentDeps]) -> Any:
+            """Get the current UTC datetime in ISO format. Use this for timestamps."""
+            return ctx.deps.current_datetime_iso
 
         @self._agent.tool
-        async def get_output_file_path(ctx: RunContext) -> Any:
-            ts = datetime.now(tz=timezone.utc).isoformat(sep="T", timespec="seconds")
-            return f"outputs/{ts}Z_{self._agent_name}.md"
+        async def get_agent_context(ctx: RunContext[AgentDeps]) -> dict[str, Any]:
+            """Get full agent context including search boundaries and regions.
+
+            Returns:
+                dict with all agent configuration fields serialized to JSON-compatible format.
+            """
+            return ctx.deps.model_dump(mode="json")
+
+        @self._agent.tool
+        async def get_output_file_path(ctx: RunContext[AgentDeps]) -> Any:
+            """Get the file path for saving output files."""
+            ts = ctx.deps.current_datetime.strftime("%Y%m%dT%H%M%S")
+            return f"outputs/{ts}Z_{ctx.deps.agent_name}.json"
 
         @self._agent.tool
         async def search_news(
-            ctx: RunContext, query: str, num_results: int = 30
+            ctx: RunContext[AgentDeps], query: str, num_results: int | None = None
         ) -> Any:
+            """Search the web for news articles. This is your PRIMARY tool for finding stock market news.
+
+            Args:
+                query: Search terms for finding news (e.g., 'stock market news Asia Europe')
+                num_results: Number of results to return (default: 30)
+
+            Returns:
+                JSON with news results containing title, url, description, page_age, and meta_url fields.
+            """
+            actual_num_results = num_results or ctx.deps.max_news_items
             response = await self._news_client.search(
                 query=query,
-                num_results=num_results,
+                num_results=actual_num_results,
             )
             return response.model_dump_json()
 
         @self._agent.tool
-        async def save_to_file(ctx: RunContext, content: str) -> str:
+        async def save_to_file(ctx: RunContext[AgentDeps], content: str) -> str:
             """Save the news analysis report to a JSON file.
 
             Args:
@@ -260,9 +333,9 @@ class PydanticAIAgentAdapter[
         """
 
         response = ""
-        i = 0
         async for event in self._agent.run_stream_events(
             user_prompt=input_data,
+            deps=self._deps,
         ):
             if isinstance(event, AgentRunResultEvent):
                 self._logger.debug("Final response received: %s", event.result)
