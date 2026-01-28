@@ -17,7 +17,10 @@ Example:
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Protocol
+import functools
+from typing import Any, Protocol
+
+from regex import T
 
 from agent_feng.domain.brave_search import NewsSearchApiResponse
 
@@ -123,6 +126,39 @@ class AgentProvider[A, T, R](Protocol):
 
         :param data: The input data for the request.
         :returns: The response from the agent provider.
+        """
+        ...
+
+
+class ConfigLoader(Protocol):
+    """Protocol for configuration loader implementations.
+
+    Example:
+        Implement a custom config loader::
+
+            from agent_feng.core.abc import ConfigLoader
+
+            class MyConfigLoader:
+                ...
+    """
+
+    def load_config(self) -> dict[str, Any]:
+        """Load configuration from the given path.
+
+        :param config_path: The path to the configuration file.
+        :returns: The loaded configuration as a dictionary.
+        """
+        ...
+
+    @functools.lru_cache()
+    def get_property[T](
+        self, key: str, default_value: Any = None, cast_type: type[T] = str
+    ) -> T:
+        """Get a configuration property by key.
+
+        :param key: The configuration key.
+        :param default_value: The default value if the key is not found.
+        :returns: The configuration value.
         """
         ...
 
