@@ -17,10 +17,8 @@ Example:
 from __future__ import annotations
 
 from enum import StrEnum
-import functools
 from typing import Any, Protocol
-
-from regex import T
+from async_lru import alru_cache
 
 from agent_feng.domain.brave_search import NewsSearchApiResponse
 
@@ -142,7 +140,7 @@ class ConfigLoader(Protocol):
                 ...
     """
 
-    def load_config(self) -> dict[str, Any]:
+    async def load_config(self) -> dict[str, Any]:
         """Load configuration from the given path.
 
         :param config_path: The path to the configuration file.
@@ -150,8 +148,8 @@ class ConfigLoader(Protocol):
         """
         ...
 
-    @functools.lru_cache()
-    def get_property[T](
+    @alru_cache(maxsize=128)
+    async def get_property[T](
         self, key: str, default_value: Any = None, cast_type: type[T] = str
     ) -> T:
         """Get a configuration property by key.

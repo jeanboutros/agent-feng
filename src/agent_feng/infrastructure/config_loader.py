@@ -17,12 +17,13 @@ Example:
 
 from __future__ import annotations
 
-import functools
 import logging
 from functools import reduce
 from pathlib import Path
 from typing import Any
 
+import aiofiles
+from async_lru import alru_cache
 import yaml
 
 from agent_feng.core.abc import ConfigLoader
@@ -87,7 +88,7 @@ class YamlConfigLoader(ConfigLoader):
         """
         return self._config_path
 
-    def load_config(self) -> dict[str, Any]:
+    async def load_config(self) -> dict[str, Any]:
         """Load configuration from the YAML file.
 
         Reads and parses the YAML file, caching the result for subsequent
@@ -101,7 +102,7 @@ class YamlConfigLoader(ConfigLoader):
             Load and access configuration::
 
                 loader = YamlConfigLoader(Path("config/config.yaml"))
-                config = loader.load_config()
+                config = await loader.load_config()
                 print(config["application"]["name"])
         """
         if self._config is not None:
@@ -120,8 +121,10 @@ class YamlConfigLoader(ConfigLoader):
             )
 
         try:
-            with self._config_path.open(mode="r", encoding="utf-8") as config_file:
-                content = yaml.safe_load(config_file)
+            async with aiofiles.open(
+                self._config_path, mode="r", encoding="utf-8"
+            ) as config_file:
+                content = yaml.safe_load(await config_file.read())
                 if content is None:
                     content = {}
                 if not isinstance(content, dict):
@@ -143,8 +146,8 @@ class YamlConfigLoader(ConfigLoader):
                 f"Failed to read file: {e}",
             ) from e
 
-    @functools.lru_cache(maxsize=20)
-    def get_property(
+    @alru_cache(maxsize=128)
+    async def get_property(
         self,
         key: str,
         default_value: Any = None,
@@ -181,7 +184,7 @@ class YamlConfigLoader(ConfigLoader):
                 provider = loader.get_property("ai.provider", default_value="openai")
         """
         if self._config is None:
-            self.load_config()
+            await self.load_config()
 
         keys = key.split(".")
         try:
@@ -216,7 +219,7 @@ class YamlConfigLoader(ConfigLoader):
             )
             return value
 
-    def reload(self) -> dict[str, Any]:
+    async def reload(self) -> dict[str, Any]:
         """Reload configuration from the YAML file.
 
         Forces a fresh read of the configuration file, discarding any
@@ -236,7 +239,7 @@ class YamlConfigLoader(ConfigLoader):
                 config = loader.reload()
         """
         self._config = None
-        return self.load_config()
+        return await self.load_config()
 
     def __repr__(self) -> str:
         """Return a string representation of the loader.

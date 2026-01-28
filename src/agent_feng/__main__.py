@@ -13,11 +13,16 @@ Example:
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 import sys
 
+import aiofiles
+
 from agent_feng.core import ApplicationContext, create_application_context
+from agent_feng.domain.brave_search import BraveNewsSearchApiResponse
 from agent_feng.domain.models import AgentDeps, NewsAnalysisReport
 
+from agent_feng.infrastructure.config_loader import YamlConfigLoader
 from agent_feng.infrastructure.web_clients import BraveSearchClient
 
 
@@ -37,10 +42,12 @@ async def async_main(context: ApplicationContext) -> int:
             context = create_application_context()
             exit_code = await async_main(context)
     """
-    context.logger.info("Agent Feng starting up")
-    context.logger.info("Environment: %s", context.environment.value)
-    context.logger.info("Log level: %s", context.log_level.value)
-    context.logger.info("Project root: %s", context.project_root)
+    logger = context.logger
+
+    logger.info("Agent Feng starting up")
+    logger.info("Environment: %s", context.environment.value)
+    logger.info("Log level: %s", context.log_level.value)
+    logger.info("Project root: %s", context.project_root)
 
     # =========================================================================
     # COMPOSITION ROOT: All dependency wiring happens here
@@ -55,28 +62,43 @@ async def async_main(context: ApplicationContext) -> int:
     from agent_feng.infrastructure.instructions import InstructionsFileReader
     from agent_feng.application.stocks_news_service import StocksNewsService
 
-    # TODO: Read agent names from config/config.yaml
-    # Sorry if you are reading this code, hardcoding for now to move fast
-    # and test things out.
-    agent_name = "feng_stocks_news_agent"
-    agent_name_1 = "feng_news_fact_checker_agent"
+    config_loader = YamlConfigLoader(config_path=context.config_path / "config.yaml")
+    agents_config = await config_loader.get_property("agents")
 
-    context.logger.debug("Loaded instructions for stocks_news agent")
+    agent_configs = agents_config[0]
+
+    logger.debug("Loaded agents configuration: %s", agent_configs)
+    agent_name = agent_configs["name"]
+
+    logger.info("Initializing agent: %s", agent_name)
+
+    # TODO: add validation
+    model_type = ModelType(agent_configs["model_type"].lower())
+    model_name = agent_configs["model_name"]
+    provider_config = agent_configs.get("provider_config", {})
+    logger.debug("Model Type: %s, Model Name: %s", model_type, model_name)
+    logger.debug("Provider Config: %s", provider_config)
+
+    guidance_file_path = Path(agent_configs.get("guidance_file"))
+    if guidance_file_path.exists():
+        logger.info("Using guidance file: %s", guidance_file_path)
+        async with aiofiles.open(guidance_file_path, mode="rt", encoding="utf-8") as f:
+            model_guidance = await f.read()
+            logger.debug("Model Guidance: %s", model_guidance)
+    else:
+        logger.warning(
+            "Guidance file %s does not exist. Using default guidance.",
+            guidance_file_path,
+        )
+        model_guidance = ""
 
     # TODO: Read these from config/config.yaml
     # Step 1: Create model adapter (Infrastructure)
     model_adapter = PydanticAIModelAdapter(
         context=context,
-        model_type=ModelType.OLLAMA,
-        # model_name="qwen3-coder:latest",
-        # model_name="qwen3-next:latest",
-        # model_name="glm-4.7-flash:q8_0",
-        # model_name="nemotron-3-nano:30b",
-        # model_name="mistral",
-        model_name="qwen3:30b",
-        provider_config={
-            "base_url": "http://localhost:11434/v1",
-        },
+        model_type=model_type,
+        model_name=model_name,
+        provider_config=provider_config,
     )
 
     # Step 2: Create agent dependencies with runtime context
@@ -85,21 +107,15 @@ async def async_main(context: ApplicationContext) -> int:
         search_lookback_hours=1,  # Only last hour of news
         target_regions=["US", "Asia", "Europe"],
         max_news_items=30,
-        model_guidance="""# Model Accuracy Guidelines
-- Use EXACT headlines from search results (verbatim, no paraphrasing)
-- Use EXACT URLs from search results (copy character-for-character)
-- Use page_age from search results for published_at timestamps
-- Process ALL news items from search results, not just one
-- Extract stock ticker if mentioned, otherwise use relevant index (SPX, NDX, etc.)
-- Determine sentiment based on actual description content""",
+        model_guidance=model_guidance,
     )
 
     # Step 3: Create agent provider (Infrastructure)
-    agent_provider = PydanticAIAgentAdapter[str, NewsAnalysisReport](
+    agent_provider = PydanticAIAgentAdapter[str, BraveNewsSearchApiResponse](
         context=context,
         model_adapter=model_adapter,
         instructions_reader=InstructionsFileReader(context=context),
-        output_type=NewsAnalysisReport,
+        output_type=BraveNewsSearchApiResponse,
         agent_name=agent_name,
         news_client=BraveSearchClient(
             api_key=context.secrets_provider.get_secret("BRAVE_API_KEY"),

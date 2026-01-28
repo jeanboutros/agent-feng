@@ -23,3 +23,18 @@ api:
   enabled: false
   host: "0.0.0.0"
   port: 8000
+
+agents:
+  - name: "feng_news_grabber"
+    role: "An AI agent that grabs news from the web."
+    instructions_file: "config/instructions/agent-feng-instructions.txt"
+    guidance_file: "config/guidance/feng_news_grabber_guidance.md"
+    model_type: "ollama"
+    model_name: "qwen2.5:14b"
+    provider_config:
+      base_url: "http://localhost:11434/v1"
+    tools:
+      - name: "web_search"
+        type: "serpapi"
+      - name: "code_executor"
+        type: "python"
